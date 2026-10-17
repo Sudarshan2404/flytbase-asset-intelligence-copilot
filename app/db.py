@@ -157,6 +157,18 @@ CREATE TABLE IF NOT EXISTS structured_corrections (
     created_at TEXT
 );
 
+CREATE TABLE IF NOT EXISTS rule_overrides (
+    override_id TEXT PRIMARY KEY,
+    rule_id TEXT NOT NULL,
+    well_type TEXT,
+    equipment_kind TEXT,
+    parameter TEXT NOT NULL,
+    value_json TEXT NOT NULL,
+    author_user_id TEXT,
+    reason TEXT,
+    created_at TEXT
+);
+
 CREATE INDEX IF NOT EXISTS idx_wells_area ON wells(area_id);
 CREATE INDEX IF NOT EXISTS idx_wells_type ON wells(well_type);
 CREATE INDEX IF NOT EXISTS idx_wells_team ON wells(team_id);
@@ -173,6 +185,7 @@ CREATE INDEX IF NOT EXISTS idx_docs_asset ON source_documents(asset_id);
 CREATE INDEX IF NOT EXISTS idx_docs_document_id ON source_documents(document_id);
 CREATE INDEX IF NOT EXISTS idx_structured_corrections_inspection
     ON structured_corrections(inspection_id);
+CREATE INDEX IF NOT EXISTS idx_rule_overrides_rule ON rule_overrides(rule_id);
 """
 
 COUNT_TABLES = (
@@ -189,6 +202,7 @@ COUNT_TABLES = (
     "ingest_warnings",
     "area_assets",
     "structured_corrections",
+    "rule_overrides",
 )
 
 

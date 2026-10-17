@@ -19,6 +19,15 @@ from app.domain.queries import (
     top_wells_by_downtime,
 )
 from app.domain.spills import classify_spill_volume
+from app.domain.compliance import (
+    apply_rule_override,
+    evaluate_spill_compliance,
+    evaluate_well_compliance,
+    late_containment_spills,
+    wells_requiring_rca,
+)
+from app.domain.findings import BREACH_STATUSES
+from app.domain.reports import parse_containment_hours
 
 __all__ = [
     "CORRECTABLE_FIELDS",
@@ -40,4 +49,11 @@ __all__ = [
     "production_history",
     "temperature_delta",
     "top_wells_by_downtime",
+    "apply_rule_override",
+    "evaluate_spill_compliance",
+    "evaluate_well_compliance",
+    "late_containment_spills",
+    "wells_requiring_rca",
+    "BREACH_STATUSES",
+    "parse_containment_hours",
 ]
