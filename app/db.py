@@ -154,7 +154,12 @@ CREATE TABLE IF NOT EXISTS structured_corrections (
     corrected_value_json TEXT NOT NULL,
     author_user_id TEXT,
     reason TEXT,
-    created_at TEXT
+    created_at TEXT,
+    scope TEXT,
+    target_type TEXT,
+    target_id TEXT,
+    original_value_json TEXT,
+    status TEXT
 );
 
 CREATE TABLE IF NOT EXISTS rule_overrides (
@@ -166,7 +171,63 @@ CREATE TABLE IF NOT EXISTS rule_overrides (
     value_json TEXT NOT NULL,
     author_user_id TEXT,
     reason TEXT,
-    created_at TEXT
+    created_at TEXT,
+    asset_id TEXT,
+    original_value_json TEXT,
+    status TEXT
+);
+
+CREATE TABLE IF NOT EXISTS shared_notes (
+    note_id TEXT PRIMARY KEY,
+    asset_id TEXT,
+    author_user_id TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    text TEXT NOT NULL,
+    referenced_record_type TEXT,
+    referenced_record_id TEXT,
+    verification_status TEXT NOT NULL,
+    valid_from TEXT,
+    valid_to TEXT,
+    note_kind TEXT
+);
+
+CREATE TABLE IF NOT EXISTS conversations (
+    conversation_id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    started_at TEXT NOT NULL,
+    title TEXT
+);
+
+CREATE TABLE IF NOT EXISTS messages (
+    message_id TEXT PRIMARY KEY,
+    conversation_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    role TEXT NOT NULL,
+    content TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS conversation_entities (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    conversation_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    entity_type TEXT NOT NULL,
+    entity_id TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS claims (
+    claim_id TEXT PRIMARY KEY,
+    author_user_id TEXT NOT NULL,
+    asset_id TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    text TEXT NOT NULL,
+    asserted_state TEXT,
+    status TEXT NOT NULL,
+    conflict_type TEXT,
+    conflicting_record_type TEXT,
+    conflicting_record_id TEXT,
+    evidence_json TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_wells_area ON wells(area_id);
@@ -186,6 +247,11 @@ CREATE INDEX IF NOT EXISTS idx_docs_document_id ON source_documents(document_id)
 CREATE INDEX IF NOT EXISTS idx_structured_corrections_inspection
     ON structured_corrections(inspection_id);
 CREATE INDEX IF NOT EXISTS idx_rule_overrides_rule ON rule_overrides(rule_id);
+CREATE INDEX IF NOT EXISTS idx_shared_notes_asset ON shared_notes(asset_id);
+CREATE INDEX IF NOT EXISTS idx_conversations_user ON conversations(user_id);
+CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id);
+CREATE INDEX IF NOT EXISTS idx_conversation_entities_user ON conversation_entities(user_id, entity_type);
+CREATE INDEX IF NOT EXISTS idx_claims_asset ON claims(asset_id);
 """
 
 COUNT_TABLES = (
@@ -203,6 +269,11 @@ COUNT_TABLES = (
     "area_assets",
     "structured_corrections",
     "rule_overrides",
+    "shared_notes",
+    "conversations",
+    "messages",
+    "conversation_entities",
+    "claims",
 )
 
 
@@ -214,8 +285,28 @@ def connect(db_path: Path) -> sqlite3.Connection:
     return conn
 
 
+_OPTIONAL_COLUMNS = (
+    ("structured_corrections", "scope", "TEXT"),
+    ("structured_corrections", "target_type", "TEXT"),
+    ("structured_corrections", "target_id", "TEXT"),
+    ("structured_corrections", "original_value_json", "TEXT"),
+    ("structured_corrections", "status", "TEXT"),
+    ("rule_overrides", "asset_id", "TEXT"),
+    ("rule_overrides", "original_value_json", "TEXT"),
+    ("rule_overrides", "status", "TEXT"),
+)
+
+
+def _add_missing_columns(conn: sqlite3.Connection) -> None:
+    for table, column, definition in _OPTIONAL_COLUMNS:
+        existing = {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
+        if column not in existing:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
+
+
 def init_schema(conn: sqlite3.Connection) -> None:
     conn.executescript(SCHEMA_SQL)
+    _add_missing_columns(conn)
 
 
 def table_counts(conn: sqlite3.Connection) -> dict[str, int]:

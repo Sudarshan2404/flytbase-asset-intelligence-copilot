@@ -130,6 +130,9 @@ def current_production_status(conn: sqlite3.Connection, asset_id: str) -> dict[s
         "method": latest["method"],
         **production,
         "inspection": latest,
+        "original_wellhead_temp_c": view.original["wellhead_temp_c"],
+        "original_ambient_temp_c": view.original["ambient_temp_c"],
+        "provenance": list(view.provenance),
     }
 
 

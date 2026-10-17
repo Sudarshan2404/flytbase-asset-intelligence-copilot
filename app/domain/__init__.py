@@ -3,8 +3,10 @@
 from app.domain.corrections import (
     CORRECTABLE_FIELDS,
     apply_structured_correction,
+    correction_history,
     effective_inspection,
     effective_spill,
+    record_correction,
 )
 from app.domain.dates import EVALUATION_TODAY, in_date_window, parse_date
 from app.domain.production import PRODUCTION_DELTA_MIN_C, production_from_temps, temperature_delta
@@ -28,6 +30,19 @@ from app.domain.compliance import (
 )
 from app.domain.findings import BREACH_STATUSES
 from app.domain.reports import parse_containment_hours
+from app.domain.knowledge import (
+    add_shared_note,
+    list_claims,
+    list_shared_notes,
+    record_statement,
+    spill_feedback_conflict,
+)
+from app.domain.memory import (
+    add_message,
+    conversation_history,
+    resolve_discussed_wells,
+    start_conversation,
+)
 
 __all__ = [
     "CORRECTABLE_FIELDS",
@@ -56,4 +71,15 @@ __all__ = [
     "wells_requiring_rca",
     "BREACH_STATUSES",
     "parse_containment_hours",
+    "correction_history",
+    "record_correction",
+    "add_shared_note",
+    "list_claims",
+    "list_shared_notes",
+    "record_statement",
+    "spill_feedback_conflict",
+    "add_message",
+    "conversation_history",
+    "resolve_discussed_wells",
+    "start_conversation",
 ]

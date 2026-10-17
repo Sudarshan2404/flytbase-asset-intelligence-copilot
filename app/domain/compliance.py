@@ -706,13 +706,19 @@ def apply_rule_override(
     return assigned
 
 
-def load_rca_threshold(conn: sqlite3.Connection, well_type: str | None, equipment_kind: str) -> tuple[int, str]:
+def load_rca_threshold(
+    conn: sqlite3.Connection,
+    well_type: str | None,
+    equipment_kind: str,
+    asset_id: str | None = None,
+) -> tuple[int, str]:
     init_schema(conn)
     rows = conn.execute(
         """
-        SELECT well_type, equipment_kind, value_json, reason
+        SELECT well_type, equipment_kind, asset_id, value_json, reason
         FROM rule_overrides
         WHERE rule_id = 'RCA' AND parameter = 'threshold'
+          AND IFNULL(status, 'active') = 'active'
         ORDER BY created_at, override_id
         """
     ).fetchall()
@@ -722,6 +728,8 @@ def load_rca_threshold(conn: sqlite3.Connection, well_type: str | None, equipmen
         if row["equipment_kind"] not in (None, equipment_kind):
             continue
         if row["well_type"] not in (None, well_type):
+            continue
+        if "asset_id" in row.keys() and row["asset_id"] not in (None, "", asset_id):
             continue
         threshold = int(json.loads(row["value_json"]))
         source = row["reason"] or "rule_override"
@@ -746,7 +754,7 @@ def rca_candidates(
         well = _well(conn, current_id)
         if well is None:
             continue
-        threshold, source = load_rca_threshold(conn, well["well_type"], equipment_kind)
+        threshold, source = load_rca_threshold(conn, well["well_type"], equipment_kind, current_id)
         jobs = list(
             conn.execute(
                 """
