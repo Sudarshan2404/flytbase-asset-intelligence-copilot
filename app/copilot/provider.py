@@ -189,6 +189,8 @@ def parse_generate_content_response(response: Any) -> ModelTurn:
         calls = parse_text_function_calls(text)
         if calls:
             text = None
+    if calls:
+        text = None
     return ModelTurn(text=text, function_calls=calls)
 
 

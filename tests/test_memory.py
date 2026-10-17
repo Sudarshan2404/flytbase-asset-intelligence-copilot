@@ -24,6 +24,15 @@ def _connect(path: Path) -> sqlite3.Connection:
     return conn
 
 
+def _scratch(source_path: Path) -> sqlite3.Connection:
+    source = _connect(source_path)
+    clone = sqlite3.connect(":memory:")
+    clone.row_factory = sqlite3.Row
+    source.backup(clone)
+    source.close()
+    return clone
+
+
 def _memory() -> sqlite3.Connection:
     conn = sqlite3.connect(":memory:")
     conn.row_factory = sqlite3.Row
@@ -266,7 +275,7 @@ def test_operator_feedback_conflict_without_formal_correction(baseline_db: Path)
 
 
 def test_regression_formal_void_then_structured_override(baseline_db: Path) -> None:
-    conn = _connect(baseline_db)
+    conn = _scratch(baseline_db)
     view = effective_inspection(conn, "INS-0001-0070")
     assert view.original["spill_detected"] is True
     assert view.spill_detected is False
@@ -287,7 +296,11 @@ def test_regression_formal_void_then_structured_override(baseline_db: Path) -> N
 
 
 def test_q15_shared_correction_on_baseline_well_0164(baseline_db: Path) -> None:
-    conn = _connect(baseline_db)
+    source = _connect(baseline_db)
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    source.backup(conn)
+    source.close()
     apply_structured_correction(
         conn,
         inspection_id="INS-0164-0205",

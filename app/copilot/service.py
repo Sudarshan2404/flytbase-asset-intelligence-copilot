@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from app.copilot.config import CopilotConfigError
 from app.copilot.loop import run_tool_loop
 from app.copilot.provider import ModelProvider, get_provider
-from app.copilot.schemas import ChatRequest, ChatResponse
+from app.copilot.schemas import ChatRequest, ChatResponse, Visualization
 from app.copilot.tools import WELL_ID_RE
 from app.domain.memory import (
     NO_MEMORY_MESSAGE,
@@ -17,7 +17,7 @@ from app.domain.memory import (
 )
 
 FOLLOW_UP_RE = re.compile(
-    r"\b(the three wells we discussed|wells we discussed|those wells|we discussed yesterday)\b",
+    r"\b(the three wells we discussed|wells we discussed|those wells we discussed|we discussed yesterday)\b",
     re.IGNORECASE,
 )
 
@@ -32,6 +32,53 @@ def _history_for_model(rows: list[dict]) -> list[dict]:
         role = "user" if row["role"] == "user" else "model"
         contents.append({"role": role, "parts": [{"text": row["content"]}]})
     return contents
+
+
+def _well_ids_in_text(text: str | None) -> list[str]:
+    if not text:
+        return []
+    return [match.group(0) for match in WELL_ID_RE.finditer(text)]
+
+
+def _well_ids_from_args(arguments: dict) -> list[str]:
+    found: list[str] = []
+    asset_id = arguments.get("asset_id")
+    if isinstance(asset_id, str):
+        found.extend(_well_ids_in_text(asset_id))
+    raw_ids = arguments.get("asset_ids")
+    if isinstance(raw_ids, str):
+        found.extend(_well_ids_in_text(raw_ids))
+    elif isinstance(raw_ids, list):
+        for item in raw_ids:
+            found.extend(_well_ids_in_text(str(item)))
+    return found
+
+
+def _well_ids_from_visual(visual: Visualization) -> list[str]:
+    found = _well_ids_in_text(visual.title)
+    found.extend(_well_ids_in_text(visual.description))
+    for point in visual.points:
+        found.extend(_well_ids_in_text(point.x))
+        found.extend(_well_ids_in_text(point.record_id))
+    for row in visual.rows:
+        for value in row.values():
+            found.extend(_well_ids_in_text(str(value)))
+    for marker in visual.markers:
+        found.extend(_well_ids_in_text(marker.label))
+        found.extend(_well_ids_in_text(marker.record_id))
+        found.extend(_well_ids_in_text(marker.detail))
+    return found
+
+
+def _discussed_well_ids(message: str, response: ChatResponse) -> list[str]:
+    """Collect wells the current turn actually discussed, including area-level tools."""
+    found = _well_ids_in_text(message)
+    found.extend(_well_ids_in_text(response.answer))
+    for item in response.tool_trace:
+        found.extend(_well_ids_from_args(item.arguments or {}))
+    for visual in response.visuals:
+        found.extend(_well_ids_from_visual(visual))
+    return list(dict.fromkeys(found))
 
 
 def handle_chat(conn, request: ChatRequest, provider: ModelProvider | None = None) -> ChatResponse:
@@ -107,12 +154,7 @@ def handle_chat(conn, request: ChatRequest, provider: ModelProvider | None = Non
     response.user_id = user_id
     response.conversation_id = conversation_id
 
-    well_ids = [match.group(0) for match in WELL_ID_RE.finditer(request.message)]
-    for item in response.tool_trace:
-        asset_id = item.arguments.get("asset_id")
-        if isinstance(asset_id, str) and WELL_ID_RE.match(asset_id):
-            well_ids.append(asset_id)
-    entities = [("well", well_id) for well_id in dict.fromkeys(well_ids)]
+    entities = [("well", well_id) for well_id in _discussed_well_ids(request.message, response)]
 
     add_message(
         conn,

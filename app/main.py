@@ -1,15 +1,35 @@
 from __future__ import annotations
 
+import os
 import sqlite3
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
+from app.catalog import router as catalog_router
 from app.config import get_database_path
 from app.copilot.schemas import ChatRequest, ChatResponse
 from app.copilot.service import handle_chat
 from app.db import connect, init_schema, table_counts
 
-app = FastAPI(title="FlytBase Asset Intelligence Copilot", version="0.1.0")
+app = FastAPI(title="FlytBase Asset Intelligence Copilot", version="0.2.0")
+
+_origins = [
+    origin.strip()
+    for origin in os.environ.get(
+        "CORS_ORIGINS",
+        "http://localhost:5173,http://127.0.0.1:5173",
+    ).split(",")
+    if origin.strip()
+]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_origins,
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Content-Type"],
+)
+app.include_router(catalog_router)
 
 
 @app.get("/health")

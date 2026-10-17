@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import os
 
+import app.config as _app_config  # loads repo-root .env once; do not re-read it per request
+
 DEFAULT_MODEL = "gemma-4-26b-a4b-it"
 MAX_TOOL_ITERATIONS = 6
 

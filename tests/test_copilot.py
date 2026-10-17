@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 
@@ -50,6 +51,16 @@ def test_missing_api_key(monkeypatch) -> None:
         get_api_key()
 
 
+def test_api_key_from_env_file(tmp_path: Path, monkeypatch) -> None:
+    from app.config import load_env_file
+
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    env_file = tmp_path / ".env"
+    env_file.write_text("GEMINI_API_KEY=file-key-for-tests\n", encoding="utf-8")
+    load_env_file(env_file)
+    assert get_api_key() == "file-key-for-tests"
+
+
 def test_default_model_id(monkeypatch) -> None:
     monkeypatch.delenv("COPILOT_MODEL", raising=False)
     assert get_model_id() == "gemma-4-26b-a4b-it"
@@ -80,9 +91,10 @@ def test_tool_iteration_limit(mini_db: Path) -> None:
         user_message="Is WELL-0001 producing?",
         history=[],
     )
-    assert response.error == "tool_iteration_limit"
+    assert response.error in {"tool_iteration_limit", "repeated_tool_calls"}
     assert response.tool_trace
     assert "invented" in response.answer.lower() or "limit" in response.answer.lower()
+    assert "let me" not in response.answer.lower()
     conn.close()
 
 
@@ -260,6 +272,47 @@ def test_private_memory_isolation_in_chat(mini_db: Path) -> None:
     conn.close()
 
 
+def test_area_level_q6_turn_stores_discussed_wells(baseline_db: Path) -> None:
+    from app.domain.memory import resolve_discussed_wells
+
+    conn = connect(baseline_db)
+    init_schema(conn)
+    provider = ScriptedProvider(
+        [
+            ModelTurn(
+                function_calls=[
+                    FunctionCall(
+                        name="get_top_downtime_wells",
+                        arguments={
+                            "area": "Northeast Block 7",
+                            "start": "2026-06-16",
+                            "end": "2026-10-16",
+                            "limit": 3,
+                        },
+                    )
+                ]
+            ),
+            ModelTurn(
+                text='{"answer":"WELL-0121 49, WELL-0138 42, WELL-0107 42","visual":{"type":"bar_chart"}}'
+            ),
+        ]
+    )
+    handle_chat(
+        conn,
+        ChatRequest(
+            message="Which 3 wells in Northeast Block 7 had the most downtime in the last 4 months?",
+            user_id="U-201",
+        ),
+        provider=provider,
+    )
+    memory = resolve_discussed_wells(conn, "U-201")
+    assert memory["found"] is True
+    assert set(memory["wells"]) == {"WELL-0121", "WELL-0138", "WELL-0107"}
+    jessica = resolve_discussed_wells(conn, "U-202")
+    assert jessica["found"] is False
+    conn.close()
+
+
 def test_follow_up_uses_same_user_memory(mini_db: Path) -> None:
     conn = _conn(mini_db)
     conversation = start_conversation(conn, "U-201", started_at="2026-10-15T09:00:00Z")
@@ -285,6 +338,114 @@ def test_follow_up_uses_same_user_memory(mini_db: Path) -> None:
         provider=provider,
     )
     assert "WELL-0001" in response.answer
+    conn.close()
+
+
+def test_chain_of_thought_is_stripped_from_final_answer(mini_db: Path) -> None:
+    conn = _conn(mini_db)
+    provider = ScriptedProvider(
+        [
+            ModelTurn(function_calls=[FunctionCall(name="get_well_status", arguments={"asset_id": "WELL-0001"})]),
+            ModelTurn(
+                text=(
+                    "Let me re-examine the tool definitions.\n"
+                    "Available tools: get_well_status, get_downtime, get_effective_spills.\n"
+                    "I will now summarize the inspection.\n"
+                    '{"answer":"WELL-0001 is not producing oil.","visual":{"type":"status_card"}}'
+                )
+            ),
+        ]
+    )
+    response = run_tool_loop(
+        provider,
+        conn,
+        user_id="U-201",
+        user_message="Is WELL-0001 producing oil right now?",
+        history=[],
+    )
+    assert response.answer == "WELL-0001 is not producing oil."
+    assert "re-examine" not in response.answer.lower()
+    assert "tool definitions" not in response.answer.lower()
+    assert "get_downtime" not in response.answer
+    conn.close()
+
+
+def test_deliberation_only_turn_is_not_shown_or_persisted(mini_db: Path) -> None:
+    conn = _conn(mini_db)
+    provider = ScriptedProvider(
+        [
+            ModelTurn(
+                text=(
+                    "Let me re-examine the tool definitions. I have get_well_status, "
+                    "get_top_downtime_wells, and get_effective_spills. First I should "
+                    "consider calling each one step by step."
+                )
+            )
+        ]
+    )
+    response = handle_chat(
+        conn,
+        ChatRequest(message="Is WELL-0001 producing oil right now?", user_id="U-201"),
+        provider=provider,
+    )
+    lowered = response.answer.lower()
+    assert "re-examine" not in lowered
+    assert "get_well_status" not in response.answer
+    assert "step by step" not in lowered
+    assert "tool definitions" not in lowered
+    stored = conn.execute(
+        "SELECT content FROM messages WHERE role = 'assistant' ORDER BY created_at DESC LIMIT 1"
+    ).fetchone()
+    assert stored is not None
+    assert "re-examine" not in stored["content"].lower()
+    assert stored["content"] == response.answer
+    conn.close()
+
+
+def test_chat_api_response_excludes_internal_analysis(mini_db: Path, monkeypatch) -> None:
+    monkeypatch.setenv("DATABASE_PATH", str(mini_db))
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    set_provider(
+        ScriptedProvider(
+            [
+                ModelTurn(function_calls=[FunctionCall(name="get_well_status", arguments={"asset_id": "WELL-0001"})]),
+                ModelTurn(
+                    text=(
+                        "<think>inventory every tool</think>"
+                        "Let me re-examine the tool definitions.\n"
+                        '{"answer":"WELL-0001 is not producing oil."}'
+                    )
+                ),
+            ]
+        )
+    )
+    try:
+        client = TestClient(app)
+        body = client.post("/chat", json={"message": "Is WELL-0001 producing?", "user_id": "U-201"}).json()
+    finally:
+        set_provider(None)
+    assert body["answer"] == "WELL-0001 is not producing oil."
+    assert "re-examine" not in body["answer"].lower()
+    assert "inventory" not in body["answer"].lower()
+    dumped = json.dumps(body)
+    assert "Let me re-examine" not in dumped
+    assert "<think>" not in dumped
+
+
+def test_repeated_tool_calls_terminate_cleanly(mini_db: Path) -> None:
+    conn = _conn(mini_db)
+    repeating = ModelTurn(function_calls=[FunctionCall(name="get_well_status", arguments={"asset_id": "WELL-0001"})])
+    provider = ScriptedProvider([repeating, repeating, repeating])
+    response = run_tool_loop(
+        provider,
+        conn,
+        user_id="U-201",
+        user_message="Is WELL-0001 producing?",
+        history=[],
+    )
+    assert response.error == "repeated_tool_calls"
+    assert len([item for item in response.tool_trace if item.ok]) == 1
+    assert "invented" in response.answer.lower() or "limit" in response.answer.lower()
     conn.close()
 
 

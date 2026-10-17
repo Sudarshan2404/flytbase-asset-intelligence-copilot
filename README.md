@@ -71,12 +71,14 @@ Health check: `GET http://127.0.0.1:8000/health`
 
 ### Copilot chat
 
-Set a Google AI Studio key. Do not commit it.
+Set a Google AI Studio key. Do not commit it. The backend reads the repo-root `.env` file on startup (see `.env.example`).
 
 ```
-set GEMINI_API_KEY=your-key
-set COPILOT_MODEL=gemma-4-26b-a4b-it
+GEMINI_API_KEY=your-key
+COPILOT_MODEL=gemma-4-26b-a4b-it
 ```
+
+You can still set the same variables in the shell; existing environment values are not overwritten.
 
 `POST /chat` accepts `message` and a caller-supplied `user_id`. That ID is **not authenticated** in this milestone.
 
@@ -87,7 +89,27 @@ POST /chat
 {"message":"Is WELL-0001 producing oil right now?","user_id":"U-201"}
 ```
 
-The response always includes `answer`, `citations`, `visual`, `conflicts`, `pending_confirmation`, `tool_trace`, `conversation_id`, `user_id`, `error`, and `identity_authenticated` (false until a later auth integration).
+The response always includes `answer`, `citations`, `visual`, `visuals`, `conflicts`, `pending_confirmation`, `tool_trace`, `conversation_id`, `user_id`, `error`, and `identity_authenticated` (false until a later auth integration). `visual` remains a type/title hint; `visuals` carries grounded chart data built from tool results.
+
+### Frontend
+
+```
+cd frontend
+copy .env.example .env
+npm install
+npm run dev
+```
+
+The Vite app proxies `/api`, `/chat`, and `/health` to `http://127.0.0.1:8000` when `VITE_API_URL` is empty. Do not put `GEMINI_API_KEY` in any frontend env file.
+
+PowerShell, two terminals:
+
+```
+uvicorn app.main:app --reload
+cd frontend; npm run dev
+```
+
+Then open `http://127.0.0.1:5173`.
 
 If hosted Gemma native tools return HTTP 500, the adapter falls back once to Gemma's prompt-encoded tool calls on the same model. It does not retry the failing native request. `COPILOT_TOOL_MODE=prompt` forces that path.
 
@@ -96,6 +118,16 @@ Optional live smoke test:
 ```
 python -m app.copilot.smoke --user-id U-201 --message "Is WELL-0001 producing oil right now?"
 ```
+
+### Evaluation harness (Q1–Q18)
+
+Deterministic checks against domain queries, not live model wording:
+
+```
+python -m app.eval.harness
+```
+
+Writes `reports/qa-eval.md`.
 
 ### Tests
 

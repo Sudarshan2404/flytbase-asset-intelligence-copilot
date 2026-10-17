@@ -1,9 +1,20 @@
 from __future__ import annotations
 
+import os
 from datetime import date, datetime, timedelta, timezone
 
-# Challenge materials treat 16 Oct 2026 as "today".
-EVALUATION_TODAY = date(2026, 10, 16)
+# Sample-dataset default. Override with EVALUATION_TODAY=YYYY-MM-DD for the test set.
+_DEFAULT_TODAY = date(2026, 10, 16)
+
+
+def evaluation_today() -> date:
+    raw = os.environ.get("EVALUATION_TODAY", "").strip()
+    if raw:
+        return date.fromisoformat(raw[:10])
+    return _DEFAULT_TODAY
+
+
+EVALUATION_TODAY = evaluation_today()
 
 
 def parse_date(value: date | datetime | str) -> date:

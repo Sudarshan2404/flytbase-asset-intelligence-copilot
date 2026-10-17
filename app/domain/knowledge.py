@@ -316,3 +316,58 @@ def spill_feedback_conflict(conn: sqlite3.Connection, inspection_id: str) -> dic
             else "Spill explanation for the inspection."
         ),
     }
+
+
+def set_user_preference(
+    conn: sqlite3.Connection,
+    *,
+    user_id: str,
+    key: str,
+    value: str,
+    created_at: str,
+) -> dict[str, Any]:
+    """Store a private display or workflow preference for one user only."""
+    init_schema(conn)
+    assigned = f"PREF-{uuid4().hex[:12]}"
+    conn.execute(
+        """
+        INSERT INTO user_preferences (preference_id, user_id, pref_key, pref_value, created_at)
+        VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(user_id, pref_key) DO UPDATE SET
+            pref_value=excluded.pref_value,
+            created_at=excluded.created_at
+        """,
+        (assigned, user_id, key, value, created_at),
+    )
+    return {
+        "preference_id": assigned,
+        "user_id": user_id,
+        "key": key,
+        "value": value,
+        "scope": "private_to_user",
+        "message": "This preference applies only to the requesting user. It is not shared.",
+    }
+
+
+def list_user_preferences(conn: sqlite3.Connection, user_id: str) -> list[dict[str, Any]]:
+    init_schema(conn)
+    rows = conn.execute(
+        """
+        SELECT preference_id, user_id, pref_key, pref_value, created_at
+        FROM user_preferences
+        WHERE user_id = ?
+        ORDER BY pref_key
+        """,
+        (user_id,),
+    ).fetchall()
+    return [
+        {
+            "preference_id": row["preference_id"],
+            "user_id": row["user_id"],
+            "key": row["pref_key"],
+            "value": row["pref_value"],
+            "created_at": row["created_at"],
+            "scope": "private_to_user",
+        }
+        for row in rows
+    ]

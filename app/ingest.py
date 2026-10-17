@@ -102,6 +102,7 @@ class Ingestor:
 
         self.ingest_fleet()
         self.ingest_wells()
+        self.apply_data_corrections()
         self.check_references()
         return self.summary()
 
@@ -293,8 +294,11 @@ class Ingestor:
         if not assets_dir.is_dir():
             self.warn("missing_file", "assets/ directory was not found", source_path="assets")
             return
-        for well_dir in sorted(path for path in assets_dir.iterdir() if path.is_dir()):
+        for index, well_dir in enumerate(sorted(path for path in assets_dir.iterdir() if path.is_dir()), start=1):
             self.ingest_well(well_dir)
+            if index % 25 == 0:
+                self.conn.commit()
+                print(f"  ingested {index} wells", flush=True)
 
     def ingest_well(self, well_dir: Path) -> None:
         folder_id = well_dir.name
@@ -565,6 +569,45 @@ class Ingestor:
             "source_path": source_path,
             "raw_json": json.dumps(record, ensure_ascii=False),
         }
+
+    def apply_data_corrections(self) -> None:
+        """Promote context data_correction notes into append-only structured corrections."""
+        from app.domain.corrections import apply_structured_correction
+
+        rows = self.conn.execute(
+            """
+            SELECT note_id, author_user_id, created_at, inspection_id, text, raw_json
+            FROM context_notes
+            WHERE note_type = 'data_correction'
+            """
+        ).fetchall()
+        for row in rows:
+            try:
+                payload = json.loads(row["raw_json"] or "{}")
+            except json.JSONDecodeError:
+                payload = {}
+            inspection_id = payload.get("inspection_id") or row["inspection_id"]
+            field_name = payload.get("field")
+            if not inspection_id or not field_name:
+                continue
+            try:
+                apply_structured_correction(
+                    self.conn,
+                    inspection_id=str(inspection_id),
+                    field_name=str(field_name),
+                    corrected_value=payload.get("corrected_value"),
+                    author_user_id=row["author_user_id"],
+                    reason=row["text"] or payload.get("text"),
+                    created_at=row["created_at"],
+                    correction_id=row["note_id"],
+                )
+            except ValueError as exc:
+                self.warn(
+                    "data_correction_skipped",
+                    str(exc),
+                    entity_type="context_notes",
+                    entity_id=row["note_id"],
+                )
 
     def existing_ids(self, table: str, column: str) -> set[str]:
         return {row[0] for row in self.conn.execute(f"SELECT {column} FROM {table}") if row[0]}

@@ -6,6 +6,7 @@ from typing import Any
 PRODUCTION_DELTA_MIN_C = {
     "T200": 15.0,
     "T350": 20.0,
+    "T500": 25.0,
 }
 
 STATUS_PRODUCING = "producing"

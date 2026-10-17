@@ -230,6 +230,15 @@ CREATE TABLE IF NOT EXISTS claims (
     evidence_json TEXT
 );
 
+CREATE TABLE IF NOT EXISTS user_preferences (
+    preference_id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    pref_key TEXT NOT NULL,
+    pref_value TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    UNIQUE(user_id, pref_key)
+);
+
 CREATE INDEX IF NOT EXISTS idx_wells_area ON wells(area_id);
 CREATE INDEX IF NOT EXISTS idx_wells_type ON wells(well_type);
 CREATE INDEX IF NOT EXISTS idx_wells_team ON wells(team_id);
@@ -274,6 +283,7 @@ COUNT_TABLES = (
     "messages",
     "conversation_entities",
     "claims",
+    "user_preferences",
 )
 
 

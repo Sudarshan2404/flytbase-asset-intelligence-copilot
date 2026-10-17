@@ -22,6 +22,15 @@ def _connect(db_path: Path) -> sqlite3.Connection:
     return conn
 
 
+def _scratch(source_path: Path) -> sqlite3.Connection:
+    source = _connect(source_path)
+    clone = sqlite3.connect(":memory:")
+    clone.row_factory = sqlite3.Row
+    source.backup(clone)
+    source.close()
+    return clone
+
+
 def _memory() -> sqlite3.Connection:
     conn = sqlite3.connect(":memory:")
     conn.row_factory = sqlite3.Row
@@ -320,7 +329,7 @@ def test_q10_southwest_block_24_late_containment(baseline_db: Path) -> None:
 
 
 def test_q13_corrected_well_0151_volume(baseline_db: Path) -> None:
-    conn = _connect(baseline_db)
+    conn = _scratch(baseline_db)
     apply_structured_correction(
         conn,
         inspection_id="INS-0151-0201",
@@ -344,7 +353,7 @@ def test_q13_corrected_well_0151_volume(baseline_db: Path) -> None:
 
 
 def test_q14_northeast_block_7_pump_jack_rca(baseline_db: Path) -> None:
-    conn = _connect(baseline_db)
+    conn = _scratch(baseline_db)
     default = {item["asset_id"] for item in wells_requiring_rca(conn, area="Northeast Block 7", equipment_kind="pump_jack")}
     assert default == {"WELL-0108", "WELL-0121", "WELL-0138"}
     apply_rule_override(
