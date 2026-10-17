@@ -212,18 +212,17 @@ def test_alternate_data_directory(tmp_path: Path) -> None:
         conn.close()
 
 
-def test_well_0001_has_203_inspections_in_baseline_and_database(tmp_path: Path) -> None:
+def test_well_0001_has_203_inspections_in_baseline_and_database(baseline_db: Path) -> None:
     source = PROJECT_ROOT / "sample-data" / "assets" / "WELL-0001" / "inspections.jsonl"
     source_count = sum(1 for line in source.read_text(encoding="utf-8").splitlines() if line.strip())
     assert source_count == 203
 
-    summary = ingest(PROJECT_ROOT / "sample-data", tmp_path / "baseline.db")
-    conn = _connect(tmp_path / "baseline.db")
+    conn = _connect(baseline_db)
     try:
         stored = conn.execute(
             "SELECT COUNT(*) FROM inspections WHERE asset_id = 'WELL-0001'"
         ).fetchone()[0]
         assert stored == 203
-        assert summary["counts"]["wells"] == 200
+        assert conn.execute("SELECT COUNT(*) FROM wells").fetchone()[0] == 200
     finally:
         conn.close()

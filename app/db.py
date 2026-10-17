@@ -147,6 +147,16 @@ CREATE TABLE IF NOT EXISTS ingest_warnings (
     raw_content TEXT
 );
 
+CREATE TABLE IF NOT EXISTS structured_corrections (
+    correction_id TEXT PRIMARY KEY,
+    inspection_id TEXT NOT NULL,
+    field_name TEXT NOT NULL,
+    corrected_value_json TEXT NOT NULL,
+    author_user_id TEXT,
+    reason TEXT,
+    created_at TEXT
+);
+
 CREATE INDEX IF NOT EXISTS idx_wells_area ON wells(area_id);
 CREATE INDEX IF NOT EXISTS idx_wells_type ON wells(well_type);
 CREATE INDEX IF NOT EXISTS idx_wells_team ON wells(team_id);
@@ -161,6 +171,8 @@ CREATE INDEX IF NOT EXISTS idx_notes_inspection ON context_notes(inspection_id);
 CREATE INDEX IF NOT EXISTS idx_docs_type ON source_documents(doc_type);
 CREATE INDEX IF NOT EXISTS idx_docs_asset ON source_documents(asset_id);
 CREATE INDEX IF NOT EXISTS idx_docs_document_id ON source_documents(document_id);
+CREATE INDEX IF NOT EXISTS idx_structured_corrections_inspection
+    ON structured_corrections(inspection_id);
 """
 
 COUNT_TABLES = (
@@ -176,6 +188,7 @@ COUNT_TABLES = (
     "unparsed_records",
     "ingest_warnings",
     "area_assets",
+    "structured_corrections",
 )
 
 
