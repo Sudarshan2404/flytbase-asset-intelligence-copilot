@@ -69,10 +69,45 @@ uvicorn app.main:app --reload
 
 Health check: `GET http://127.0.0.1:8000/health`
 
+### Copilot chat
+
+Set a Google AI Studio key. Do not commit it.
+
+```
+set GEMINI_API_KEY=your-key
+set COPILOT_MODEL=gemma-4-26b-a4b-it
+```
+
+`POST /chat` accepts `message` and a caller-supplied `user_id`. That ID is **not authenticated** in this milestone.
+
+Example:
+
+```
+POST /chat
+{"message":"Is WELL-0001 producing oil right now?","user_id":"U-201"}
+```
+
+The response always includes `answer`, `citations`, `visual`, `conflicts`, `pending_confirmation`, `tool_trace`, `conversation_id`, `user_id`, `error`, and `identity_authenticated` (false until a later auth integration).
+
+If hosted Gemma native tools return HTTP 500, the adapter falls back once to Gemma's prompt-encoded tool calls on the same model. It does not retry the failing native request. `COPILOT_TOOL_MODE=prompt` forces that path.
+
+Optional live smoke test:
+
+```
+python -m app.copilot.smoke --user-id U-201 --message "Is WELL-0001 producing oil right now?"
+```
+
 ### Tests
 
 ```
 pytest
+```
+
+Live model smoke (skipped by default):
+
+```
+set RUN_LIVE_COPILOT=1
+pytest -m live
 ```
 
 `data/`, `*.db`, and other runtime artifacts are gitignored.
