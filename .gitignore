@@ -218,3 +218,17 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Organizer-only prototype, not part of the participant repo
+prototype/
+
+# Generated runtime artifacts
+data/
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+
+# OS files
+.DS_Store
+Thumbs.db

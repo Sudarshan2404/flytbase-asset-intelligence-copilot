@@ -22,6 +22,61 @@ Build a chat copilot that answers operators' plain-English questions about an oi
 
 All data is synthetic and created for this challenge. Manuals and procedures are simplified, fictional documents, not real operating or legal guidance.
 
+## Application setup (Milestone 1)
+
+The backend is a small FastAPI service with a SQLite ingest pipeline. It discovers
+wells from `sample-data/assets/` (or another `--data-dir`) and does not hardcode
+the well count.
+
+### Install
+
+Python 3.14 is sufficient. From the repository root:
+
+```
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+```
+
+On macOS or Linux, activate with `source .venv/bin/activate`.
+
+### Ingest the dataset
+
+```
+python -m app.ingest
+```
+
+Defaults:
+
+- data directory: `sample-data` (override with `--data-dir` or `DATA_DIR`)
+- database: `data/copilot.db` (override with `--db` or `DATABASE_PATH`)
+
+Example for a later evaluation dataset:
+
+```
+python -m app.ingest --data-dir path\to\eval-data --db data\eval.db
+```
+
+The command prints per-table counts and any ingest warnings (malformed rows or
+broken references). Re-running it updates existing records and does not create
+duplicates.
+
+### Run the API
+
+```
+uvicorn app.main:app --reload
+```
+
+Health check: `GET http://127.0.0.1:8000/health`
+
+### Tests
+
+```
+pytest
+```
+
+`data/`, `*.db`, and other runtime artifacts are gitignored.
+
 ## License
 
 [MIT](LICENSE)

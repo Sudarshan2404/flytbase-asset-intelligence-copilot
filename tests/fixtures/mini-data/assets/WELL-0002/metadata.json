@@ -1,0 +1,14 @@
+{
+  "asset_id": "WELL-0002",
+  "name": "SW-23 Well 002",
+  "asset_category": "oil_well",
+  "well_type": "T200",
+  "area_id": "SW-23",
+  "team_id": "TEAM-SW",
+  "in_charge_user_id": null,
+  "location": null,
+  "installed_on": null,
+  "equipment": [],
+  "last_inspection": null,
+  "recorded_status": "active"
+}

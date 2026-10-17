@@ -1,0 +1,18 @@
+{
+  "areas": [
+    {
+      "area_id": "SW-23",
+      "name": "Southwest Block 23",
+      "team_id": "TEAM-SW",
+      "center": { "lat": 31.842, "lon": -102.512 },
+      "asset_ids": ["WELL-0001", "WELL-MISSING"]
+    }
+  ],
+  "teams": [
+    {
+      "team_id": "TEAM-SW",
+      "name": "Southwest Production",
+      "lead_user_id": "U-101"
+    }
+  ]
+}

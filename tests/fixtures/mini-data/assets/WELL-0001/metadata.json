@@ -1,0 +1,20 @@
+{
+  "asset_id": "WELL-0001",
+  "name": "SW-23 Well 001",
+  "asset_category": "oil_well",
+  "well_type": "T200",
+  "area_id": "SW-23",
+  "team_id": "TEAM-SW",
+  "in_charge_user_id": "U-101",
+  "location": { "lat": 31.85425, "lon": -102.50232 },
+  "installed_on": "2013-03-25",
+  "equipment": [
+    { "equipment_id": "WELL-0001-WH", "kind": "wellhead", "model": "WH-3000" }
+  ],
+  "last_inspection": {
+    "inspection_id": "INS-0001-0002",
+    "inspected_at": "2026-10-15T09:45:00Z",
+    "inspector_user_id": "U-104"
+  },
+  "recorded_status": "active"
+}

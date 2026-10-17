@@ -1,0 +1,16 @@
+{
+  "users": [
+    {
+      "user_id": "U-101",
+      "name": "Emily Carter",
+      "role": "production_supervisor",
+      "team_id": "TEAM-SW"
+    },
+    {
+      "user_id": "U-104",
+      "name": "Ryan Brooks",
+      "role": "field_inspector",
+      "team_id": "TEAM-SW"
+    }
+  ]
+}
